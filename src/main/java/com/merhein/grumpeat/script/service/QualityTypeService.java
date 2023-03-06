@@ -10,9 +10,9 @@ import java.sql.Statement;
 import java.util.ArrayList;
 
 public class QualityTypeService {
-    public ArrayList<QualityType> getQualityTypes(String databaseName){
+    public ArrayList<QualityType> getQualityTypes(String databaseName, String databaseUser, String databasePassword){
         DatabaseConnection databaseConnection = new DatabaseConnection();
-        Connection c = databaseConnection.getConnection(databaseName);
+        Connection c = databaseConnection.getConnection(databaseName,databaseUser,databasePassword);
         Statement stmt = null;
         ArrayList<QualityType> qualityTypes = new ArrayList<>();
         try {
@@ -33,17 +33,21 @@ public class QualityTypeService {
         }
         return qualityTypes;
     }
-    public void saveQualityTypes(String databaseName, ArrayList<QualityType> qualityTypes){
+    public void saveQualityTypes(String databaseName, String databaseUser, String databasePassword, ArrayList<QualityType> qualityTypes){
         DatabaseConnection databaseConnection = new DatabaseConnection();
-        Connection c = databaseConnection.getConnection(databaseName);
+        Connection c = databaseConnection.getConnection(databaseName,databaseUser,databasePassword);
         try {
             c.setAutoCommit(false);
             PreparedStatement prepStmt = c.prepareStatement(
                     "INSERT INTO quality_type(id,name) values (?,?)");
             for (QualityType qualityType : qualityTypes) {
-                prepStmt.setLong(1, qualityType.getId());
-                prepStmt.setString(2, qualityType.getName());
-                prepStmt.addBatch();
+                Statement stmt = c.createStatement();
+                ResultSet rs = stmt.executeQuery( "SELECT * FROM quality_type where id = "+qualityType.getId()+";" );
+                if (rs==null || rs.wasNull() || !rs.next()) {
+                    prepStmt.setLong(1, qualityType.getId());
+                    prepStmt.setString(2, qualityType.getName());
+                    prepStmt.addBatch();
+                }
             }
             int [] numUpdates=prepStmt.executeBatch();
             for (int i=0; i < numUpdates.length; i++) {
@@ -66,8 +70,8 @@ public class QualityTypeService {
      * @param fromDatabase of the existing database name
      * @param toDatabase of the new database name
      **/
-    public void migrateQualityTypes(String fromDatabase, String toDatabase){
-        ArrayList<QualityType> qualityTypes = getQualityTypes(fromDatabase);
-        saveQualityTypes(toDatabase, qualityTypes);
+    public void migrateQualityTypes(String fromDatabase, String fromDatabaseUser, String fromDatabasePassword, String toDatabase, String toDatabaseUser, String toDatabasePassword){
+        ArrayList<QualityType> qualityTypes = getQualityTypes(fromDatabase,fromDatabaseUser,fromDatabasePassword);
+        saveQualityTypes(toDatabase,toDatabaseUser,toDatabasePassword, qualityTypes);
     }
 }

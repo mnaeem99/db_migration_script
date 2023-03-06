@@ -10,9 +10,9 @@ import java.sql.Statement;
 import java.util.ArrayList;
 
 public class LocalityTranslationService {
-    public ArrayList<LocalityTranslation> getLocalities(String databaseName){
+    public ArrayList<LocalityTranslation> getLocalities(String databaseName, String databaseUser, String databasePassword){
         DatabaseConnection databaseConnection = new DatabaseConnection();
-        Connection c = databaseConnection.getConnection(databaseName);
+        Connection c = databaseConnection.getConnection(databaseName,databaseUser,databasePassword);
         Statement stmt = null;
         ArrayList<LocalityTranslation> localities = new ArrayList<>();
         try {
@@ -35,19 +35,23 @@ public class LocalityTranslationService {
         }
         return localities;
     }
-    public void saveLocalities(String databaseName, ArrayList<LocalityTranslation> localities){
+    public void saveLocalities(String databaseName, String databaseUser, String databasePassword, ArrayList<LocalityTranslation> localities){
         DatabaseConnection databaseConnection = new DatabaseConnection();
-        Connection c = databaseConnection.getConnection(databaseName);
+        Connection c = databaseConnection.getConnection(databaseName,databaseUser,databasePassword);
         try {
             c.setAutoCommit(false);
             PreparedStatement prepStmt = c.prepareStatement(
                     "INSERT INTO locality_translation(id,name,language,locality_id) values (?,?,?,?)");
             for (LocalityTranslation locality : localities) {
-                prepStmt.setLong(1, locality.getId());
-                prepStmt.setString(2, locality.getName());
-                prepStmt.setString(3, locality.getLanguage());
-                prepStmt.setLong(4, locality.getLocalityId());
-                prepStmt.addBatch();
+                Statement stmt = c.createStatement();
+                ResultSet rs = stmt.executeQuery( "SELECT * FROM locality_translation where id = "+locality.getId()+";" );
+                if (rs==null || rs.wasNull() || !rs.next()) {
+                    prepStmt.setLong(1, locality.getId());
+                    prepStmt.setString(2, locality.getName());
+                    prepStmt.setString(3, locality.getLanguage());
+                    prepStmt.setLong(4, locality.getLocalityId());
+                    prepStmt.addBatch();
+                }
             }
             int [] numUpdates=prepStmt.executeBatch();
             for (int i=0; i < numUpdates.length; i++) {
@@ -70,8 +74,8 @@ public class LocalityTranslationService {
      * @param fromDatabase of the existing database name
      * @param toDatabase of the new database name
      **/
-    public void migrateLocalityTranslation(String fromDatabase, String toDatabase){
-        ArrayList<LocalityTranslation> localities = getLocalities(fromDatabase);
-        saveLocalities(toDatabase, localities);
+    public void migrateLocalityTranslation(String fromDatabase, String fromDatabaseUser, String fromDatabasePassword, String toDatabase, String toDatabaseUser, String toDatabasePassword){
+        ArrayList<LocalityTranslation> localities = getLocalities(fromDatabase,fromDatabaseUser,fromDatabasePassword);
+        saveLocalities(toDatabase,toDatabaseUser,toDatabasePassword, localities);
     }
 }

@@ -10,9 +10,9 @@ import java.sql.Statement;
 import java.util.ArrayList;
 
 public class StatusService {
-    public ArrayList<Status> getStatuses(String databaseName){
+    public ArrayList<Status> getStatuses(String databaseName, String databaseUser, String databasePassword){
         DatabaseConnection databaseConnection = new DatabaseConnection();
-        Connection c = databaseConnection.getConnection(databaseName);
+        Connection c = databaseConnection.getConnection(databaseName,databaseUser,databasePassword);
         Statement stmt = null;
         ArrayList<Status> statuses = new ArrayList<>();
         try {
@@ -34,18 +34,22 @@ public class StatusService {
         }
         return statuses;
     }
-    public void saveStatuses(String databaseName, ArrayList<Status> statuses){
+    public void saveStatuses(String databaseName, String databaseUser, String databasePassword, ArrayList<Status> statuses){
         DatabaseConnection databaseConnection = new DatabaseConnection();
-        Connection c = databaseConnection.getConnection(databaseName);
+        Connection c = databaseConnection.getConnection(databaseName,databaseUser,databasePassword);
         try {
             c.setAutoCommit(false);
             PreparedStatement prepStmt = c.prepareStatement(
                     "INSERT INTO status(id,name,percentage) values (?,?,?)");
             for (Status status : statuses) {
-                prepStmt.setLong(1, status.getId());
-                prepStmt.setString(2, status.getName());
-                prepStmt.setInt(3, status.getPercentage());
-                prepStmt.addBatch();
+                Statement stmt = c.createStatement();
+                ResultSet rs = stmt.executeQuery( "SELECT * FROM status where id = "+status.getId()+";" );
+                if (rs==null || rs.wasNull() || !rs.next()) {
+                    prepStmt.setLong(1, status.getId());
+                    prepStmt.setString(2, status.getName());
+                    prepStmt.setInt(3, status.getPercentage());
+                    prepStmt.addBatch();
+                }
             }
             int [] numUpdates=prepStmt.executeBatch();
             for (int i=0; i < numUpdates.length; i++) {
@@ -68,8 +72,8 @@ public class StatusService {
      * @param fromDatabase of the existing database name
      * @param toDatabase of the new database name
      **/
-    public void migrateStatuses(String fromDatabase, String toDatabase){
-        ArrayList<Status> statuses = getStatuses(fromDatabase);
-        saveStatuses(toDatabase, statuses);
+    public void migrateStatuses(String fromDatabase, String fromDatabaseUser, String fromDatabasePassword, String toDatabase, String toDatabaseUser, String toDatabasePassword){
+        ArrayList<Status> statuses = getStatuses(fromDatabase,fromDatabaseUser,fromDatabasePassword);
+        saveStatuses(toDatabase,toDatabaseUser,toDatabasePassword, statuses);
     }
 }

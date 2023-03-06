@@ -15,9 +15,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ImageService {
-    public ArrayList<Image> getImages(String databaseName){
+    public ArrayList<Image> getImages(String databaseName, String databaseUser, String databasePassword){
         DatabaseConnection databaseConnection = new DatabaseConnection();
-        Connection c = databaseConnection.getConnection(databaseName);
+        Connection c = databaseConnection.getConnection(databaseName,databaseUser,databasePassword);
         Statement stmt = null;
         ArrayList<Image> images = new ArrayList<>();
         try {
@@ -39,25 +39,28 @@ public class ImageService {
         }
         return images;
     }
-    public void saveImages(String databaseName, String fromBucket, String toBucket, ArrayList<Image> images){
+    public void saveImages(String databaseName, String databaseUser, String databasePassword, String fromBucket, String toBucket, ArrayList<Image> images){
         DatabaseConnection databaseConnection = new DatabaseConnection();
-        Connection c = databaseConnection.getConnection(databaseName);
+        Connection c = databaseConnection.getConnection(databaseName,databaseUser,databasePassword);
         try {
             c.setAutoCommit(false);
             PreparedStatement prepStmt = c.prepareStatement(
                     "INSERT INTO images(id,image_url,thumbnail_url) values (?,?,?)");
             for (Image image : images) {
-                prepStmt.setLong(1, image.getId());
-                if (image.getImageUrl().contains(fromBucket)) {
-                    //change s3 bucket url path
-                    String imageUrl = image.getImageUrl().replace(fromBucket,toBucket);
-                    prepStmt.setString(2, imageUrl);
+                Statement stmt = c.createStatement();
+                ResultSet rs = stmt.executeQuery( "SELECT * FROM images where id = "+image.getId()+";" );
+                if (rs==null || rs.wasNull() || !rs.next()) {
+                    prepStmt.setLong(1, image.getId());
+                    if (image.getImageUrl().contains(fromBucket)) {
+                        //change s3 bucket url path
+                        String imageUrl = image.getImageUrl().replace(fromBucket, toBucket);
+                        prepStmt.setString(2, imageUrl);
+                    } else {
+                        prepStmt.setString(2, image.getImageUrl());
+                    }
+                    prepStmt.setString(3, image.getThumbnailUrl());
+                    prepStmt.addBatch();
                 }
-                else {
-                    prepStmt.setString(2, image.getImageUrl());
-                }
-                prepStmt.setString(3, image.getThumbnailUrl());
-                prepStmt.addBatch();
             }
             int [] numUpdates=prepStmt.executeBatch();
             for (int i=0; i < numUpdates.length; i++) {
@@ -91,9 +94,9 @@ public class ImageService {
      * @param fromBucket of the existing bucket name
      * @param toBucket of the new bucket name
      **/
-    public void migrateImages(String fromDatabase, String toDatabase, String fromBucket, String toBucket){
+    public void migrateImages(String fromDatabase, String fromDatabaseUser, String fromDatabasePassword, String toDatabase, String toDatabaseUser, String toDatabasePassword, String fromBucket, String toBucket){
 //        migrateS3BucketObjects(fromBucket, toBucket);
-        ArrayList<Image> images = getImages(fromDatabase);
-        saveImages(toDatabase, fromBucket, toBucket, images);
+        ArrayList<Image> images = getImages(fromDatabase,fromDatabaseUser,fromDatabasePassword);
+        saveImages(toDatabase,toDatabaseUser,toDatabasePassword, fromBucket, toBucket, images);
     }
 }

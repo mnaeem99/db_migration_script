@@ -7,9 +7,9 @@ import java.sql.*;
 import java.util.ArrayList;
 
 public class LocalityService {
-    public ArrayList<Locality> getLocalities(String databaseName){
+    public ArrayList<Locality> getLocalities(String databaseName, String databaseUser, String databasePassword){
         DatabaseConnection databaseConnection = new DatabaseConnection();
-        Connection c = databaseConnection.getConnection(databaseName);
+        Connection c = databaseConnection.getConnection(databaseName,databaseUser,databasePassword);
         Statement stmt = null;
         ArrayList<Locality> localities = new ArrayList<>();
         try {
@@ -38,19 +38,23 @@ public class LocalityService {
         }
         return localities;
     }
-    public void saveLocalities(String databaseName, ArrayList<Locality> localities){
+    public void saveLocalities(String databaseName, String databaseUser, String databasePassword, ArrayList<Locality> localities){
         DatabaseConnection databaseConnection = new DatabaseConnection();
-        Connection c = databaseConnection.getConnection(databaseName);
+        Connection c = databaseConnection.getConnection(databaseName,databaseUser,databasePassword);
         try {
             c.setAutoCommit(false);
             PreparedStatement prepStmt = c.prepareStatement(
                     "INSERT INTO locality(id,place_id,picture_id,city_id) values (?,?,?,?)");
             for (Locality locality : localities) {
-                prepStmt.setLong(1, locality.getId());
-                prepStmt.setString(2, locality.getPlaceId());
-                setLongOrNull(prepStmt,3, locality.getPictureId());
-                setLongOrNull(prepStmt, 4, locality.getCityId());
-                prepStmt.addBatch();
+                Statement stmt = c.createStatement();
+                ResultSet rs = stmt.executeQuery( "SELECT * FROM locality where id = "+locality.getId()+";" );
+                if (rs==null || rs.wasNull() || !rs.next()) {
+                    prepStmt.setLong(1, locality.getId());
+                    prepStmt.setString(2, locality.getPlaceId());
+                    setLongOrNull(prepStmt, 3, locality.getPictureId());
+                    setLongOrNull(prepStmt, 4, locality.getCityId());
+                    prepStmt.addBatch();
+                }
             }
             int [] numUpdates=prepStmt.executeBatch();
             for (int i=0; i < numUpdates.length; i++) {
@@ -79,8 +83,8 @@ public class LocalityService {
      * @param fromDatabase of the existing database name
      * @param toDatabase of the new database name
      **/
-    public void migrateLocalities(String fromDatabase, String toDatabase){
-        ArrayList<Locality> localities = getLocalities(fromDatabase);
-        saveLocalities(toDatabase, localities);
+    public void migrateLocalities(String fromDatabase, String fromDatabaseUser, String fromDatabasePassword, String toDatabase, String toDatabaseUser, String toDatabasePassword){
+        ArrayList<Locality> localities = getLocalities(fromDatabase,fromDatabaseUser,fromDatabasePassword);
+        saveLocalities(toDatabase,toDatabaseUser,toDatabasePassword, localities);
     }
 }

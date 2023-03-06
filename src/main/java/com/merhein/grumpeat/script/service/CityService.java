@@ -7,9 +7,9 @@ import java.sql.*;
 import java.util.ArrayList;
 
 public class CityService {
-    public ArrayList<City> getCities(String databaseName){
+    public ArrayList<City> getCities(String databaseName, String databaseUser, String databasePassword){
         DatabaseConnection databaseConnection = new DatabaseConnection();
-        Connection c = databaseConnection.getConnection(databaseName);
+        Connection c = databaseConnection.getConnection(databaseName,databaseUser,databasePassword);
         Statement stmt = null;
         ArrayList<City> cities = new ArrayList<>();
         try {
@@ -38,19 +38,23 @@ public class CityService {
         }
         return cities;
     }
-    public void saveCities(String databaseName, ArrayList<City> cities){
+    public void saveCities(String databaseName, String databaseUser, String databasePassword, ArrayList<City> cities){
         DatabaseConnection databaseConnection = new DatabaseConnection();
-        Connection c = databaseConnection.getConnection(databaseName);
+        Connection c = databaseConnection.getConnection(databaseName,databaseUser,databasePassword);
         try {
             c.setAutoCommit(false);
             PreparedStatement prepStmt = c.prepareStatement(
                     "INSERT INTO city(id,place_id,picture_id,country_id) values (?,?,?,?)");
             for (City city : cities) {
-                prepStmt.setLong(1, city.getId());
-                prepStmt.setString(2, city.getPlaceId());
-                setLongOrNull(prepStmt,3, city.getPictureId());
-                setLongOrNull(prepStmt, 4, city.getCountryId());
-                prepStmt.addBatch();
+                Statement stmt = c.createStatement();
+                ResultSet rs = stmt.executeQuery( "SELECT * FROM city where id = "+city.getId()+";" );
+                if (rs==null || rs.wasNull() || !rs.next()) {
+                    prepStmt.setLong(1, city.getId());
+                    prepStmt.setString(2, city.getPlaceId());
+                    setLongOrNull(prepStmt, 3, city.getPictureId());
+                    setLongOrNull(prepStmt, 4, city.getCountryId());
+                    prepStmt.addBatch();
+                }
             }
             int [] numUpdates=prepStmt.executeBatch();
             for (int i=0; i < numUpdates.length; i++) {
@@ -79,8 +83,8 @@ public class CityService {
      * @param fromDatabase of the existing database name
      * @param toDatabase of the new database name
      **/
-    public void migrateCities(String fromDatabase, String toDatabase){
-        ArrayList<City> cities = getCities(fromDatabase);
-        saveCities(toDatabase, cities);
+    public void migrateCities(String fromDatabase, String fromDatabaseUser, String fromDatabasePassword, String toDatabase, String toDatabaseUser, String toDatabasePassword){
+        ArrayList<City> cities = getCities(fromDatabase,fromDatabaseUser,fromDatabasePassword);
+        saveCities(toDatabase,toDatabaseUser,toDatabasePassword, cities);
     }
 }

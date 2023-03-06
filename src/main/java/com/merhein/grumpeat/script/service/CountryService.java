@@ -7,9 +7,9 @@ import java.sql.*;
 import java.util.ArrayList;
 
 public class CountryService {
-    public ArrayList<Country> getCountries(String databaseName){
+    public ArrayList<Country> getCountries(String databaseName, String databaseUser, String databasePassword){
         DatabaseConnection databaseConnection = new DatabaseConnection();
-        Connection c = databaseConnection.getConnection(databaseName);
+        Connection c = databaseConnection.getConnection(databaseName,databaseUser,databasePassword);
         Statement stmt = null;
         ArrayList<Country> countries = new ArrayList<>();
         try {
@@ -38,20 +38,24 @@ public class CountryService {
         }
         return countries;
     }
-    public void saveCountries(String databaseName, ArrayList<Country> countries){
+    public void saveCountries(String databaseName, String databaseUser, String databasePassword, ArrayList<Country> countries){
         DatabaseConnection databaseConnection = new DatabaseConnection();
-        Connection c = databaseConnection.getConnection(databaseName);
+        Connection c = databaseConnection.getConnection(databaseName,databaseUser,databasePassword);
         try {
             c.setAutoCommit(false);
             PreparedStatement prepStmt = c.prepareStatement(
                     "INSERT INTO country(id,code,picture_id,flag_id) values (?,?,?,?)");
             for (Country country : countries) {
-                prepStmt.setLong(1, country.getId());
-                prepStmt.setString(2, country.getCode());
-                setLongOrNull(prepStmt,3, country.getPictureId());
-                setLongOrNull(prepStmt, 4, country.getFlagId());
-                System.out.println(country.toString());
-                prepStmt.addBatch();
+                Statement stmt = c.createStatement();
+                ResultSet rs = stmt.executeQuery( "SELECT * FROM country where id = "+country.getId()+";" );
+                if (rs==null || rs.wasNull() || !rs.next()) {
+                    prepStmt.setLong(1, country.getId());
+                    prepStmt.setString(2, country.getCode());
+                    setLongOrNull(prepStmt, 3, country.getPictureId());
+                    setLongOrNull(prepStmt, 4, country.getFlagId());
+                    System.out.println(country.toString());
+                    prepStmt.addBatch();
+                }
             }
             int [] numUpdates=prepStmt.executeBatch();
             for (int i=0; i < numUpdates.length; i++) {
@@ -80,8 +84,8 @@ public class CountryService {
      * @param fromDatabase of the existing database name
      * @param toDatabase of the new database name
      **/
-    public void migrateCountries(String fromDatabase, String toDatabase){
-        ArrayList<Country> countries = getCountries(fromDatabase);
-        saveCountries(toDatabase, countries);
+    public void migrateCountries(String fromDatabase, String fromDatabaseUser, String fromDatabasePassword, String toDatabase, String toDatabaseUser, String toDatabasePassword){
+        ArrayList<Country> countries = getCountries(fromDatabase,fromDatabaseUser,fromDatabasePassword);
+        saveCountries(toDatabase,toDatabaseUser,toDatabasePassword, countries);
     }
 }

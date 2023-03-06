@@ -10,9 +10,9 @@ import java.sql.Statement;
 import java.util.ArrayList;
 
 public class RestaurantPriceService {
-    public ArrayList<RestaurantPrice> getRestaurantPrices(String databaseName){
+    public ArrayList<RestaurantPrice> getRestaurantPrices(String databaseName, String databaseUser, String databasePassword){
         DatabaseConnection databaseConnection = new DatabaseConnection();
-        Connection c = databaseConnection.getConnection(databaseName);
+        Connection c = databaseConnection.getConnection(databaseName,databaseUser,databasePassword);
         Statement stmt = null;
         ArrayList<RestaurantPrice> restaurantPrices = new ArrayList<>();
         try {
@@ -33,17 +33,21 @@ public class RestaurantPriceService {
         }
         return restaurantPrices;
     }
-    public void saveRestaurantPrices(String databaseName, ArrayList<RestaurantPrice> restaurantPrices){
+    public void saveRestaurantPrices(String databaseName, String databaseUser, String databasePassword, ArrayList<RestaurantPrice> restaurantPrices){
         DatabaseConnection databaseConnection = new DatabaseConnection();
-        Connection c = databaseConnection.getConnection(databaseName);
+        Connection c = databaseConnection.getConnection(databaseName,databaseUser,databasePassword);
         try {
             c.setAutoCommit(false);
             PreparedStatement prepStmt = c.prepareStatement(
                     "INSERT INTO restaurant_price(id,name) values (?,?)");
             for (RestaurantPrice restaurantPrice : restaurantPrices) {
-                prepStmt.setLong(1, restaurantPrice.getId());
-                prepStmt.setString(2, restaurantPrice.getName());
-                prepStmt.addBatch();
+                Statement stmt = c.createStatement();
+                ResultSet rs = stmt.executeQuery( "SELECT * FROM restaurant_price where id = "+restaurantPrice.getId()+";" );
+                if (rs==null || rs.wasNull() || !rs.next()) {
+                    prepStmt.setLong(1, restaurantPrice.getId());
+                    prepStmt.setString(2, restaurantPrice.getName());
+                    prepStmt.addBatch();
+                }
             }
             int [] numUpdates=prepStmt.executeBatch();
             for (int i=0; i < numUpdates.length; i++) {
@@ -66,8 +70,8 @@ public class RestaurantPriceService {
      * @param fromDatabase of the existing database name
      * @param toDatabase of the new database name
      **/
-    public void migrateRestaurantPrices(String fromDatabase, String toDatabase){
-        ArrayList<RestaurantPrice> restaurantPrices = getRestaurantPrices(fromDatabase);
-        saveRestaurantPrices(toDatabase, restaurantPrices);
+    public void migrateRestaurantPrices(String fromDatabase, String fromDatabaseUser, String fromDatabasePassword, String toDatabase, String toDatabaseUser, String toDatabasePassword){
+        ArrayList<RestaurantPrice> restaurantPrices = getRestaurantPrices(fromDatabase,fromDatabaseUser,fromDatabasePassword);
+        saveRestaurantPrices(toDatabase,toDatabaseUser,toDatabasePassword, restaurantPrices);
     }
 }

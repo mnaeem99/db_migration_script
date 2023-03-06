@@ -10,9 +10,9 @@ import java.sql.Statement;
 import java.util.ArrayList;
 
 public class CityTranslationService {
-    public ArrayList<CityTranslation> getCities(String databaseName){
+    public ArrayList<CityTranslation> getCities(String databaseName, String databaseUser, String databasePassword){
         DatabaseConnection databaseConnection = new DatabaseConnection();
-        Connection c = databaseConnection.getConnection(databaseName);
+        Connection c = databaseConnection.getConnection(databaseName,databaseUser,databasePassword);
         Statement stmt = null;
         ArrayList<CityTranslation> cities = new ArrayList<>();
         try {
@@ -35,19 +35,23 @@ public class CityTranslationService {
         }
         return cities;
     }
-    public void saveCities(String databaseName, ArrayList<CityTranslation> cities){
+    public void saveCities(String databaseName, String databaseUser, String databasePassword, ArrayList<CityTranslation> cities){
         DatabaseConnection databaseConnection = new DatabaseConnection();
-        Connection c = databaseConnection.getConnection(databaseName);
+        Connection c = databaseConnection.getConnection(databaseName,databaseUser,databasePassword);
         try {
             c.setAutoCommit(false);
             PreparedStatement prepStmt = c.prepareStatement(
                     "INSERT INTO city_translation(id,name,language,city_id) values (?,?,?,?)");
             for (CityTranslation city : cities) {
-                prepStmt.setLong(1, city.getId());
-                prepStmt.setString(2, city.getName());
-                prepStmt.setString(3, city.getLanguage());
-                prepStmt.setLong(4, city.getCityId());
-                prepStmt.addBatch();
+                Statement stmt = c.createStatement();
+                ResultSet rs = stmt.executeQuery( "SELECT * FROM city_translation where id = "+city.getId()+";" );
+                if (rs==null || rs.wasNull() || !rs.next()) {
+                    prepStmt.setLong(1, city.getId());
+                    prepStmt.setString(2, city.getName());
+                    prepStmt.setString(3, city.getLanguage());
+                    prepStmt.setLong(4, city.getCityId());
+                    prepStmt.addBatch();
+                }
             }
             int [] numUpdates=prepStmt.executeBatch();
             for (int i=0; i < numUpdates.length; i++) {
@@ -70,8 +74,8 @@ public class CityTranslationService {
      * @param fromDatabase of the existing database name
      * @param toDatabase of the new database name
      **/
-    public void migrateCityTranslation(String fromDatabase, String toDatabase){
-        ArrayList<CityTranslation> cities = getCities(fromDatabase);
-        saveCities(toDatabase, cities);
+    public void migrateCityTranslation(String fromDatabase, String fromDatabaseUser, String fromDatabasePassword, String toDatabase, String toDatabaseUser, String toDatabasePassword){
+        ArrayList<CityTranslation> cities = getCities(fromDatabase,fromDatabaseUser,fromDatabasePassword);
+        saveCities(toDatabase,toDatabaseUser,toDatabasePassword, cities);
     }
 }
